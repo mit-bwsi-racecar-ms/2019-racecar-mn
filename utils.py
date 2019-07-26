@@ -68,19 +68,19 @@ def show_identified_video(colorRange, min_size, func, time_limit, rc):
 #############################
 
 def get_moment(contour, res, screen_center):
+    speed, angle = res
     M = cv2.moments(contour)
     if M['m00'] != 0.0:
         cx = int(M['m10']/M['m00'])
         c = -.5
-        if res[0] < 0:
+        if speed < 0:
             c = .5
         ratio = 0 
         dist = cx - screen_center*1.0
         if abs(dist) > 20 and screen_center != 0:
             ratio = dist/screen_center
-            res[1] = ratio*c 
-            #print(dist, ratio, angle)
-            return res   
+            angle = ratio*c 
+            return [speed, angle]   
     return [0, 0]
     
     
