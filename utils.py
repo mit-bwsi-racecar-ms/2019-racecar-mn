@@ -38,6 +38,7 @@ def show_frame(frame):
 #### Identify Cone
 #############################
 
+# returns the contour with the biggest area from a list of contours
 def find_greatest_contour(contours):
     largest_contour = [-1, -1] 
     for i, cnt in enumerate(contours):
@@ -45,11 +46,11 @@ def find_greatest_contour(contours):
             largest_contour  = [i, cv2.contourArea(cnt)]
     return contours[largest_contour[0]]
 
-def show_identified_image(colorRange, min_size, func, save_image):
+def show_identified_image(func, save_image):
     global display
     display = IPython.display.display('', display_id=1)
     cap = cv2.VideoCapture(2)
-    frame = func(cap.read()[1], (colorRange, min_size))
+    frame = func(cap.read()[1])
     if save_image:
         print('saving image...')
         timestr = time.strftime("%m%d%Y-%H%M%S.png")
@@ -57,10 +58,10 @@ def show_identified_image(colorRange, min_size, func, save_image):
     show_frame(frame)
     cap.release()
 
-def show_identified_video(colorRange, min_size, func, time_limit, rc):
+def show_identified_video(func, time_limit, rc):
     global display
     display = IPython.display.display('', display_id=2)
-    rc.run(func, (colorRange, min_size), time_limit)
+    rc.run(func, time_limit)
 
 
 #############################
