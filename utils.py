@@ -6,6 +6,7 @@
 import os
 import cv2
 import numpy as np
+import math
 
 # ROS 
 try:
@@ -30,6 +31,62 @@ try:
 except:
     print('ipywidgets is not installed')
 
+#############################
+#### Racecar ROS Class
+#############################
+
+# Starter code class that handles the fancy stuff. No need to modify this! 
+class Racecar:
+    SCAN_TOPIC = "/scan"
+    IMAGE_TOPIC = "/camera"
+    DRIVE_TOPIC = "/drive"
+    
+    def __init__(self):
+        self.sub_scan = rospy.Subscriber(self.SCAN_TOPIC, LaserScan, callback=self.scan_callback)
+        self.sub_image = rospy.Subscriber(self.IMAGE_TOPIC, Image, callback=self.image_callback)
+        self.pub_drive = rospy.Publisher(self.DRIVE_TOPIC, AckermannDriveStamped, queue_size=1)
+        self.last_drive = AckermannDriveStamped()
+    
+    def image_callback(self, msg):
+        self.last_image = msg.data
+        
+    def show_last_image(self):
+        im = np.fromstring(self.last_image,dtype=np.uint8).reshape((480,-1,3))[...,::-1]
+        return im
+        
+    def scan_callback(self, msg):
+        self.last_scan = msg.ranges
+        
+    def drive(self, speed, angle):
+        msg = AckermannDriveStamped()
+        msg.drive.speed = speed
+        msg.drive.steering_angle = math.degrees(angle)  # thresholded at 0.25 radians = 14 degrees
+        self.last_drive = msg
+    
+    def stop(self):
+        self.drive(0, 0) #self.last_drive.drive.steering_angle)
+    
+    def look(self):
+        return self.last_image
+    
+    def scan(self):
+        return self.last_scan
+    
+    def run(self, func, limit=10):
+        r = rospy.Rate(60)
+        t = rospy.get_time()
+        cap = cv2.VideoCapture(2)
+        while rospy.get_time() - t < time_limit and not rospy.is_shutdown():
+            func(cap.read()[1])
+            self.pub_drive.publish(self.last_drive)
+            r.sleep()
+        cap.release()
+        print("END OF ROSPY RUN")
+        self.stop()
+        self.pub_drive.publish(self.last_drive)
+        time.sleep(0.1)
+        
+        
 #############################
 #### Parameters
 #############################
