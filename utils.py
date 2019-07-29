@@ -60,11 +60,11 @@ class Racecar:
     def drive(self, speed, angle):
         msg = AckermannDriveStamped()
         msg.drive.speed = speed
-        msg.drive.steering_angle = math.degrees(angle)  # thresholded at 0.25 radians = 14 degrees
+        msg.drive.steering_angle = angle * (0.25 / 20) # threshold 0.25, approx 20 degrees
         self.last_drive = msg
     
     def stop(self):
-        self.drive(0, 0) #self.last_drive.drive.steering_angle)
+        self.drive(0, 0)
     
     def look(self):
         return self.last_image
