@@ -35,7 +35,9 @@ except:
 #### Racecar ROS Class
 #############################
 
-# Starter code class that handles the fancy stuff. No need to modify this! 
+# Starter code class that handles the fancy stuff. No need to modify this!
+cap = None
+released = True
 class Racecar:
     SCAN_TOPIC = "/scan"
     IMAGE_TOPIC = "/camera"
@@ -73,14 +75,33 @@ class Racecar:
         return self.last_scan
     
     def run(self, func, limit=10):
+        global cap, released
         r = rospy.Rate(60)
         t = rospy.get_time()
+        if not released:
+            cap.release()
+            released = True
         cap = cv2.VideoCapture(2)
+        released = False
         while rospy.get_time() - t < limit and not rospy.is_shutdown():
-            func(cap.read()[1])
-            self.pub_drive.publish(self.last_drive)
+            frame = None
+            try:
+                frame = cap.read()[1]
+            except:
+                print('Video feed is in use. Please run again or restart kernal.')
+            if frame is None:
+                print('Video feed is in use. Please run again or restart kernal.')
+                break
+            else:
+                try:
+                    func(cap.read()[1])
+                    self.pub_drive.publish(self.last_drive)
+                except Exception as e:
+                    print(e)
+                    break
             r.sleep()
         cap.release()
+        released = True
         print("END OF ROSPY RUN")
         self.stop()
         self.pub_drive.publish(self.last_drive)
@@ -161,25 +182,43 @@ def hsv_select_live(limit = 10, fps = 4):
     
     # Live masked video for the thread
     def show_masked_video():
-        video = cv2.VideoCapture(video_port)
+        global cap, released
+        if not released:
+            cap.release()
+            released = True
+        cap = cv2.VideoCapture(video_port)
+        released = False
         start = time.time()
         while time.time() - start < limit:
-            frame = video.read()[1]
-            if frame is not None:
-                hsv_min = (h.value[0], s.value[0], v.value[0])
-                hsv_max = (h.value[1], s.value[1], v.value[1])
-                frame = cv2.resize(frame, (320, 240))
-                frame = cv2.flip(frame, 1)
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-                mask = cv2.inRange(img_hsv, hsv_min, hsv_max)
-                img_masked = cv2.bitwise_and(frame, frame, mask = mask)
-                f = BytesIO()
-                PIL.Image.fromarray(img_masked).save(f, 'jpeg')
-                img_jpeg = IPython.display.Image(data=f.getvalue())
-                display.update(img_jpeg)
-                time.sleep(1.0 / fps)
-        video.release()
+            frame = None
+            try:
+                frame = cap.read()[1]
+            except:
+                print('Video feed is in use. Please run again or restart kernal.')
+            if frame is None:
+                print('Video feed is in use. Please run again or restart kernal.')
+                break
+            else:
+                try:
+                    hsv_min = (h.value[0], s.value[0], v.value[0])
+                    hsv_max = (h.value[1], s.value[1], v.value[1])
+                    frame = cv2.resize(frame, (320, 240))
+                    frame = cv2.flip(frame, 1)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    img_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+                    mask = cv2.inRange(img_hsv, hsv_min, hsv_max)
+                    img_masked = cv2.bitwise_and(frame, frame, mask = mask)
+                    f = BytesIO()
+                    PIL.Image.fromarray(img_masked).save(f, 'jpeg')
+                    img_jpeg = IPython.display.Image(data=f.getvalue())
+                    display.update(img_jpeg)
+                    time.sleep(1.0 / fps)
+                except Exception as e:
+                    print(e)
+                    break
+        cap.release()
+        released = True
+        print('END OF HSV SELECT')
     
     # Open video on new thread (needed for slider update)
     hsv_thread = threading.Thread(target=show_masked_video)
