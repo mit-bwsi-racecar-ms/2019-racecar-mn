@@ -6,7 +6,7 @@
 import os
 import cv2
 import numpy as np
-import math
+from matplotlib import pyplot as plt
 
 # ROS 
 try:
@@ -60,11 +60,11 @@ class Racecar:
     def drive(self, speed, angle):
         msg = AckermannDriveStamped()
         msg.drive.speed = speed
-        msg.drive.steering_angle = angle * (0.25 / 20) # threshold 0.25, approx 20 degrees
+        msg.drive.steering_angle = angle*(0.25/20)  # thresholded at 0.25 radians, approx 20 degrees
         self.last_drive = msg
     
     def stop(self):
-        self.drive(0, 0)
+        self.drive(0, 0) #self.last_drive.drive.steering_angle)
     
     def look(self):
         return self.last_image
@@ -76,7 +76,7 @@ class Racecar:
         r = rospy.Rate(60)
         t = rospy.get_time()
         cap = cv2.VideoCapture(2)
-        while rospy.get_time() - t < time_limit and not rospy.is_shutdown():
+        while rospy.get_time() - t < limit and not rospy.is_shutdown():
             func(cap.read()[1])
             self.pub_drive.publish(self.last_drive)
             r.sleep()
@@ -97,10 +97,17 @@ video_port = 2
 # Display ID
 current_display_id = 1 # keeps track of display id
 
-
 #############################
 #### General Display
 #############################
+
+def show_inline(img):
+    '''Displays an image inline.'''
+    b, g, r = cv2.split(img)
+    rgb_img = cv2.merge([r,g,b])
+    plt.imshow(rgb_img)
+    plt.xticks([]), plt.yticks([])
+    plt.show()
 
 def show_frame(frame):
     global display
@@ -111,18 +118,10 @@ def show_frame(frame):
     img = IPython.display.Image(data=f.getvalue())
     display.update(img)
 
-    
+
 #############################
 #### Identify Cone
 #############################
-
-# returns the contour with the biggest area from a list of contours
-def find_greatest_contour(contours):
-    largest_contour = [-1, -1] 
-    for i, cnt in enumerate(contours):
-        if (cv2.contourArea(cnt) >= largest_contour[1]):
-            largest_contour  = [i, cv2.contourArea(cnt)]
-    return contours[largest_contour[0]]
 
 def show_video(func, time_limit, rc):
     global display, current_display_id
@@ -140,14 +139,6 @@ def show_image(func):
     frame = func(cap.read()[1])   
     show_frame(frame)
     cap.release()
-
-
-#############################
-#### Line Follow
-#############################
-
-def crop(img, top, bottom):
-    return img[top:bottom,:,:]
 
 
 #############################
@@ -193,3 +184,56 @@ def hsv_select_live(limit = 10, fps = 4):
     # Open video on new thread (needed for slider update)
     hsv_thread = threading.Thread(target=show_masked_video)
     hsv_thread.start()
+
+#############################
+#### Feature Detection
+#############################
+
+def find_object(img, img_q, isDetected, kp_img, kp_frame, good_matches, color, query_columns):
+    '''
+    Draws an outline around a detected objects given matches and keypoints.
+
+    If enough matches are found, extract the locations of matched keypoints in both images.
+    The matched keypoints are passed to find the 3x3 perpective transformation matrix.
+    Use transformation matrix to transform the corners of img to corresponding points in trainImage.
+    Draw matches.
+    '''
+    if isDetected:
+        src_pts = np.float32([ kp_img[m.queryIdx].pt for m in good_matches ]).reshape(-1,1,2)
+        dst_pts = np.float32([ kp_frame[m.trainIdx].pt for m in good_matches ]).reshape(-1,1,2)
+
+        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+        matchesMask = mask.ravel().tolist()
+
+        h,w = img_q.shape
+        pts = np.float32([ [0,0],[0,h-1],[w-1,h-1],[w-1,0] ]).reshape(-1,1,2)
+        
+        #print ("M: " + str(M))
+        
+        if M is not None:
+            dst = cv2.perspectiveTransform(pts,M)
+
+            dst[:,:,0] += query_columns
+            #print ("x:" + str(dst[:, :, 0][0]))
+            #print ("y: " + str(dst[:,:,1]))
+        
+            x1 = dst[:, :, 0][0]
+            y1 = dst[:, :, 1][0]
+
+            x2 = dst[:, :, 0][3]
+            y2 = dst[:, :, 1][3]
+
+            center = (x1 + abs(x1 - x2)/2, y1 - abs(y1 - y2)/2)
+            length = abs(x1 - x2)
+
+            cv2.circle(img, center, 30, (0, 255, 0), 5)
+
+            cv2.polylines(img,[np.int32(dst)], True, color ,3, cv2.LINE_AA)
+            dst = None
+            return img, center[0], length #the x coordinate indicating the center of the sign. #legnth of the box surronding the sign.
+        else:
+            matchesMask= None
+            return img, -1, -1
+    else:
+        matchesMask = None
+        return img, -1, -1 # if center[0] = -1 then didn't find center
