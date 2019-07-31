@@ -82,15 +82,16 @@ class Racecar:
             cap.release()
             released = True
         cap = cv2.VideoCapture(2)
+        resize_cap(cap, resize_height, resize_width)
         released = False
         while rospy.get_time() - t < limit and not rospy.is_shutdown():
             frame = None
             try:
                 frame = cap.read()[1]
             except:
-                print('Video feed is in use. Please run again or restart kernal.')
+                print('Video feed is in use. Please run again or restart kernel.')
             if frame is None:
-                print('Video feed is in use. Please run again or restart kernal.')
+                print('Video feed is in use. Please run again or restart kernel.')
                 break
             else:
                 try:
@@ -118,6 +119,10 @@ video_port = 2
 # Display ID
 current_display_id = 1 # keeps track of display id
 
+# Resize dimensions
+resize_width = 640
+resize_height = 480
+
 #############################
 #### General Display
 #############################
@@ -132,13 +137,15 @@ def show_inline(img):
 
 def show_frame(frame):
     global display
-    frame = cv2.resize(frame, (320, 240))
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     f = BytesIO()
     PIL.Image.fromarray(frame).save(f, 'jpeg')
     img = IPython.display.Image(data=f.getvalue())
     display.update(img)
 
+def resize_cap(cap, width, height):
+    cap.set(3,width)
+    cap.set(4,height)
 
 #############################
 #### Identify Cone
@@ -157,7 +164,8 @@ def show_image(func):
     current_display_id += 1
     
     cap = cv2.VideoCapture(video_port)
-    frame = func(cap.read()[1])   
+    resize_cap(cap, resize_width, resize_height)
+    frame = func(cap.read()[1])  
     show_frame(frame)
     cap.release()
 
@@ -187,6 +195,7 @@ def hsv_select_live(limit = 10, fps = 4):
             cap.release()
             released = True
         cap = cv2.VideoCapture(video_port)
+        resize_cap(cap, resize_width, resize_height)
         released = False
         start = time.time()
         while time.time() - start < limit:
@@ -194,15 +203,14 @@ def hsv_select_live(limit = 10, fps = 4):
             try:
                 frame = cap.read()[1]
             except:
-                print('Video feed is in use. Please run again or restart kernal.')
+                print('Video feed is in use. Please run again or restart kernel.')
             if frame is None:
-                print('Video feed is in use. Please run again or restart kernal.')
+                print('Video feed is in use. Please run again or restart kernel.')
                 break
             else:
                 try:
                     hsv_min = (h.value[0], s.value[0], v.value[0])
                     hsv_max = (h.value[1], s.value[1], v.value[1])
-                    frame = cv2.resize(frame, (320, 240))
                     frame = cv2.flip(frame, 1)
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     img_hsv = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
@@ -276,3 +284,4 @@ def find_object(img, img_q, isDetected, kp_img, kp_frame, good_matches, color, q
     else:
         matchesMask = None
         return img, -1, -1 # if center[0] = -1 then didn't find center
+
