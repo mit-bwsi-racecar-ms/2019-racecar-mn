@@ -3,4 +3,4 @@ DS_Store
 *.pyc
 
 # Labs
-ConeFollowing.ipynb
+02-cone_following/ConeFollowing.ipynb
