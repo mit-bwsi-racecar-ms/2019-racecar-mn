@@ -94,8 +94,8 @@ class Racecar:
                 print('Video feed is in use. Please run again or restart kernel.')
                 break
             else:
-            	func(cap.read()[1])
-            	self.pub_drive.publish(self.last_drive)
+                func(cap.read()[1])
+                self.pub_drive.publish(self.last_drive)
             r.sleep()
         cap.release()
         released = True
