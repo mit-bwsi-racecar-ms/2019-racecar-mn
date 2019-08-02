@@ -165,6 +165,17 @@ def show_image(func):
     show_frame(frame)
     cap.release()
 
+def show_picture(img):
+    global display, current_display_id
+    # setup display
+    display = IPython.display.display('', display_id=current_display_id)
+    current_display_id += 1
+    # display image
+    f = BytesIO()
+    PIL.Image.fromarray(img).save(f, 'jpeg')
+    display_image = IPython.display.Image(data=f.getvalue())
+    display.update(display_image)
+    
 
 #############################
 #### HSV Select
@@ -232,7 +243,7 @@ def hsv_select_live(limit = 10, fps = 4):
 #### Feature Detection
 #############################
 
-def find_object(img, img_q, isDetected, kp_img, kp_frame, good_matches, color, query_columns):
+def find_object(img, img_q, detected, kp_img, kp_frame, good_matches, query_columns):
     '''
     Draws an outline around a detected objects given matches and keypoints.
 
@@ -241,24 +252,21 @@ def find_object(img, img_q, isDetected, kp_img, kp_frame, good_matches, color, q
     Use transformation matrix to transform the corners of img to corresponding points in trainImage.
     Draw matches.
     '''
-    if isDetected:
+    dst = []
+    if detected:
         src_pts = np.float32([ kp_img[m.queryIdx].pt for m in good_matches ]).reshape(-1,1,2)
         dst_pts = np.float32([ kp_frame[m.trainIdx].pt for m in good_matches ]).reshape(-1,1,2)
 
         M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
         matchesMask = mask.ravel().tolist()
 
-        h,w = img_q.shape
+        h,w,ch = img_q.shape
         pts = np.float32([ [0,0],[0,h-1],[w-1,h-1],[w-1,0] ]).reshape(-1,1,2)
-        
-        #print ("M: " + str(M))
         
         if M is not None:
             dst = cv2.perspectiveTransform(pts,M)
 
             dst[:,:,0] += query_columns
-            #print ("x:" + str(dst[:, :, 0][0]))
-            #print ("y: " + str(dst[:,:,1]))
         
             x1 = dst[:, :, 0][0]
             y1 = dst[:, :, 1][0]
@@ -267,17 +275,12 @@ def find_object(img, img_q, isDetected, kp_img, kp_frame, good_matches, color, q
             y2 = dst[:, :, 1][3]
 
             center = (x1 + abs(x1 - x2)/2, y1 - abs(y1 - y2)/2)
-            length = abs(x1 - x2)
 
-            cv2.circle(img, center, 30, (0, 255, 0), 5)
-
-            cv2.polylines(img,[np.int32(dst)], True, color ,3, cv2.LINE_AA)
-            dst = None
-            return img, center[0], length #the x coordinate indicating the center of the sign. #legnth of the box surronding the sign.
+            return img, dst, center[0], center[1]
         else:
             matchesMask= None
-            return img, -1, -1
+            return img, dst, -1, -1
     else:
         matchesMask = None
-        return img, -1, -1 # if center[0] = -1 then didn't find center
-
+        return img, dst, -1, -1   # if center[0] = -1 then didn't find center
+    
